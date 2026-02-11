@@ -1,0 +1,16 @@
+{
+  "name": "CASHCLEAR Pro Terminal",
+  "short_name": "CashClear    ",
+  "description": "Enterprise Voucher Management System",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1E3A8A",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/5968/5968313.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
