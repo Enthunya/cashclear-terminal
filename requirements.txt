@@ -1,6 +1,7 @@
 streamlit
 pandas
-opencv-python-headless
-numpy
+twilio
 qrcode
 Pillow
+numpy
+opencv-python-headless
