@@ -10,7 +10,10 @@ from datetime import datetime, timedelta
 import pandas as pd
 from twilio.rest import Client
 
-# 1. APP CONFIG
+# -------------------------
+# 1. APP CONFIG & SEO
+# -------------------------
+# Set 'CashClear' as the page title for Google Search indexing
 st.set_page_config(page_title="CashClear", page_icon="🛡️", layout="centered")
 
 # Pulling security keys from Streamlit Cloud Secrets
@@ -23,11 +26,14 @@ TWILIO_SID = st.secrets.get("TWILIO_SID", "AC5a42dcce247849417d3648bef1098905")
 TWILIO_TOKEN = st.secrets.get("TWILIO_TOKEN", "2e5d560b9ea8101aae7e0b7de8d14e93")
 TWILIO_WHATSAPP_FROM = "whatsapp:+14155238886"
 
-# 2. DATABASE INITIALIZATION
+# -------------------------
+# 2. DATABASE & SECURITY LOGIC
+# -------------------------
 DB_PATH = "pip_data.db" 
 db = sqlite3.connect(DB_PATH, check_same_thread=False)
 
 def hash_pw(pw: str): 
+    # Creates a secure hash using your unique Salt
     return hashlib.sha256((pw + PIP_HASH_SALT).encode()).hexdigest()
 
 def init_db():
@@ -39,7 +45,7 @@ def init_db():
         amount REAL, issued_at TEXT, expiry TEXT, 
         issuer TEXT, location TEXT)""")
     
-    # Create/Update Admin with Salted Password
+    # EMERGENCY RESET: 'INSERT OR REPLACE' forces the password to update
     admin_pw_hashed = hash_pw(MASTER_ADMIN_PASSWORD)
     db.execute("""INSERT OR REPLACE INTO accounts 
                (account_id, password, balance, role, location, status, pin) 
@@ -49,7 +55,9 @@ def init_db():
 
 init_db()
 
+# -------------------------
 # 3. UTILITIES
+# -------------------------
 def generate_qr_b64(data: str):
     qr = qrcode.QRCode(box_size=10, border=2)
     qr.add_data(data)
@@ -67,7 +75,9 @@ def send_whatsapp(to_phone, message_body):
         st.error(f"WhatsApp Error: {e}")
         return False
 
+# -------------------------
 # 4. LOGIN INTERFACE
+# -------------------------
 if "auth" not in st.session_state: st.session_state.auth = None
 
 if not st.session_state.auth:
@@ -78,19 +88,23 @@ if not st.session_state.auth:
     pw = st.text_input("Password", type="password")
     
     if st.button("Unlock Terminal", use_container_width=True):
+        # Master Override
         if pw == MASTER_OVERRIDE_KEY:
             st.session_state.auth = {"id": "DEV-DEBUG", "role": "Dev", "loc": "Override Access"}
             st.rerun()
         
+        # Salted Hashing Check
         user = db.execute("SELECT account_id, role, location FROM accounts WHERE account_id=? AND password=?",
                           (uid, hash_pw(pw))).fetchone()
         if user:
             st.session_state.auth = {"id": user[0], "role": user[1], "loc": user[2]}
             st.rerun()
         else:
-            st.error("Access Denied: Check Credentials or Secrets.")
+            st.error("Access Denied: Please check your password in Streamlit Secrets.")
 else:
+    # -------------------------
     # 5. MAIN TERMINAL
+    # -------------------------
     st.title(f"Terminal: {st.session_state.auth['loc']}")
     
     with st.sidebar:
@@ -113,11 +127,12 @@ else:
     tab1, tab2, tab3 = st.tabs(["🚀 Issue P-Code", "📊 Batch & Lotto", "📜 History"])
 
     with tab1:
+        st.subheader("Send Single Voucher")
         phone = st.text_input("Customer Phone (+27...)")
         amt = st.number_input("Amount (R)", min_value=1.0, value=50.0)
         if st.button("Send Voucher via WhatsApp"):
             p_code = f"PIP-{phone[-4:]}-{random.randint(1000,9999)}"
-            msg = f"CashClear P-Code: {p_code}\nValue: R{amt}\nLocation: Benoni HQ"
+            msg = f"CashClear P-Code: {p_code}\nValue: R{amt}\nValid for 30 Days."
             if send_whatsapp(phone, msg):
                 db.execute("INSERT INTO passes VALUES (?,?,?,?,?,?,?,?)", 
                            (phone, p_code, "Active", amt, datetime.now().isoformat(), 
@@ -126,7 +141,7 @@ else:
                 db.execute("UPDATE accounts SET balance = balance - ? WHERE account_id=?", 
                            (amt, st.session_state.auth["id"]))
                 db.commit()
-                st.success("Sent!")
+                st.success("Successfully Dispatched!")
                 st.image(f"data:image/png;base64,{generate_qr_b64(p_code)}")
 
     with tab2:
@@ -139,6 +154,6 @@ else:
             st.table(pd.DataFrame(boards))
 
     with tab3:
-        st.subheader("History")
+        st.subheader("Transaction History")
         hist_df = pd.read_sql("SELECT * FROM passes ORDER BY issued_at DESC", db)
         st.dataframe(hist_df)
